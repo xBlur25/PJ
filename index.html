@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Player Info</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+        }
+        .tab-button.active {
+            background-color: #4a5568; /* Darker gray for active tab */
+            color: #cbd5e0; /* Lighter text for active tab */
+            border-bottom: 2px solid #63b3ed; /* Blue underline */
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4">
+
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-4xl">
+        <h1 class="text-4xl font-bold text-center text-blue-400 mb-8">Minecraft Player Information</h1>
+
+        <!-- Username Input -->
+        <div class="flex flex-col sm:flex-row items-center justify-center mb-8 space-y-4 sm:space-y-0 sm:space-x-4">
+            <input type="text" id="usernameInput" placeholder="Enter Minecraft Username"
+                   class="p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto flex-grow">
+            <button id="searchButton"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full sm:w-auto">
+                Search Player
+            </button>
+        </div>
+
+        <!-- Player Info Display -->
+        <div id="playerInfo" class="hidden bg-gray-700 p-6 rounded-lg shadow-md mb-8">
+            <div class="flex items-center space-x-6 mb-4">
+                <img id="playerHead" src="https://placehold.co/64x64/334155/e2e8f0?text=HEAD" alt="Player Head"
+                     class="w-16 h-16 rounded-full border-2 border-blue-400 shadow-md">
+                <div>
+                    <h2 id="playerName" class="text-3xl font-semibold text-white"></h2>
+                    <p id="playerStatus" class="text-lg text-gray-300"></p>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="flex border-b border-gray-600 mb-4">
+                <button class="tab-button py-3 px-6 text-gray-400 hover:text-white transition duration-200 active" data-tab="chat">Chat Messages</button>
+                <button class="tab-button py-3 px-6 text-gray-400 hover:text-white transition duration-200" data-tab="ban">Ban History</button>
+                <button class="tab-button py-3 px-6 text-gray-400 hover:text-white transition duration-200" data-tab="mute">Mute History</button>
+                <button class="tab-button py-3 px-6 text-gray-400 hover:text-white transition duration-200" data-tab="reports">Report History</button>
+                <button class="tab-button py-3 px-6 text-gray-400 hover:text-white transition duration-200" data-tab="kills">Kill History</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div id="chatContent" class="tab-content active bg-gray-800 p-4 rounded-lg overflow-y-auto max-h-96">
+                <h3 class="text-xl font-semibold text-blue-300 mb-3">Chat Messages</h3>
+                <ul id="chatList" class="space-y-2 text-sm text-gray-300">
+                    <!-- Chat messages will be loaded here -->
+                </ul>
+            </div>
+            <div id="banContent" class="tab-content bg-gray-800 p-4 rounded-lg overflow-y-auto max-h-96">
+                <h3 class="text-xl font-semibold text-blue-300 mb-3">Ban History</h3>
+                <ul id="banList" class="space-y-2 text-sm text-gray-300">
+                    <!-- Ban history will be loaded here -->
+                </ul>
+            </div>
+            <div id="muteContent" class="tab-content bg-gray-800 p-4 rounded-lg overflow-y-auto max-h-96">
+                <h3 class="text-xl font-semibold text-blue-300 mb-3">Mute History</h3>
+                <ul id="muteList" class="space-y-2 text-sm text-gray-300">
+                    <!-- Mute history will be loaded here -->
+                </ul>
+            </div>
+            <div id="reportsContent" class="tab-content bg-gray-800 p-4 rounded-lg overflow-y-auto max-h-96">
+                <h3 class="text-xl font-semibold text-blue-300 mb-3">Report History (Against & By Player)</h3>
+                <ul id="reportsList" class="space-y-2 text-sm text-gray-300">
+                    <!-- Report history will be loaded here -->
+                </ul>
+            </div>
+            <div id="killsContent" class="tab-content bg-gray-800 p-4 rounded-lg overflow-y-auto max-h-96">
+                <h3 class="text-xl font-semibold text-blue-300 mb-3">Kill History</h3>
+                <ul id="killList" class="space-y-2 text-sm text-gray-300">
+                    <!-- Kill history will be loaded here -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Message Box for Errors/No Player Found -->
+        <div id="messageBox" class="hidden bg-red-800 text-white p-4 rounded-lg text-center">
+            <p id="messageText"></p>
+            <button id="closeMessageBox" class="mt-2 bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded-md">Close</button>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:5000'; // Flask backend URL
+        const usernameInput = document.getElementById('usernameInput');
+        const searchButton = document.getElementById('searchButton');
+        const playerInfoDiv = document.getElementById('playerInfo');
+        const playerHead = document.getElementById('playerHead');
+        const playerName = document.getElementById('playerName');
+        const playerStatus = document.getElementById('playerStatus');
+        const chatList = document.getElementById('chatList');
+        const banList = document.getElementById('banList');
+        const muteList = document.getElementById('muteList');
+        const reportsList = document.getElementById('reportsList');
+        const killList = document.getElementById('killList'); // New element for kill history
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBox = document.getElementById('closeMessageBox');
+
+        // Tab functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+                button.classList.add('active');
+                document.getElementById(button.dataset.tab + 'Content').classList.add('active');
+            });
+        });
+
+        searchButton.addEventListener('click', fetchPlayerData);
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                fetchPlayerData();
+            }
+        });
+        closeMessageBox.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        async function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            playerInfoDiv.classList.add('hidden'); // Hide player info if message box is shown
+        }
+
+        async function fetchPlayerData() {
+            const username = usernameInput.value.trim();
+            if (!username) {
+                await showMessageBox("Please enter a Minecraft username.");
+                return;
+            }
+
+            playerInfoDiv.classList.add('hidden'); // Hide previous info
+            messageBox.classList.add('hidden'); // Hide any previous messages
+
+            // Fetch player status
+            try {
+                const playerResponse = await fetch(`${API_BASE_URL}/player/${username}`);
+                if (playerResponse.status === 404) {
+                    await showMessageBox(`Player '${username}' not found in the database.`);
+                    return;
+                }
+                if (!playerResponse.ok) {
+                    throw new Error(`HTTP error! status: ${playerResponse.status}`);
+                }
+                const playerData = await playerResponse.json();
+                displayPlayerInfo(playerData);
+
+                // Fetch and display other data concurrently
+                await Promise.all([
+                    fetchChatMessages(username),
+                    fetchPunishments(username),
+                    fetchReports(username),
+                    fetchKillHistory(username) // Fetch kill history as well
+                ]);
+
+                playerInfoDiv.classList.remove('hidden'); // Show player info after successful fetch
+
+            } catch (error) {
+                console.error('Error fetching player data:', error);
+                await showMessageBox(`Failed to fetch data for '${username}'. Please ensure the Flask backend is running and the username is correct. Error: ${error.message}`);
+            }
+        }
+
+        function displayPlayerInfo(player) {
+            playerName.textContent = player.username;
+            playerHead.src = `https://minotar.net/avatar/${player.username}/64`; // Minotar for player heads
+            playerHead.onerror = () => {
+                playerHead.src = "https://placehold.co/64x64/334155/e2e8f0?text=HEAD"; // Fallback image
+            };
+
+            let statusText = "Clean";
+            if (player.is_banned && player.is_muted) {
+                statusText = "Banned and Muted";
+            } else if (player.is_banned) {
+                statusText = "Banned";
+            } else if (player.is_muted) {
+                statusText = "Muted";
+            }
+            playerStatus.textContent = `Status: ${statusText}`;
+        }
+
+        async function fetchChatMessages(username) {
+            chatList.innerHTML = ''; // Clear previous messages
+            try {
+                const response = await fetch(`${API_BASE_URL}/player/${username}/chat`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const messages = await response.json();
+                if (messages.length === 0) {
+                    chatList.innerHTML = '<li class="text-gray-500">No chat messages found.</li>';
+                    return;
+                }
+                messages.forEach(msg => {
+                    const li = document.createElement('li');
+                    let messageClass = 'text-gray-300';
+                    if (msg.message_type === 'swear_filtered') {
+                        messageClass = 'text-red-400';
+                    } else if (msg.message_type === 'advertise_filtered') {
+                        messageClass = 'text-yellow-400';
+                    }
+                    // Display server_name if available, otherwise just the message
+                    const serverInfo = msg.server_name ? `<span class="font-semibold text-gray-400">${msg.server_name}</span> ` : '';
+                    li.className = `p-2 rounded-md ${messageClass} break-words`;
+                    li.innerHTML = `<span class="font-semibold text-gray-400">[${new Date(msg.chat_timestamp).toLocaleString()}]</span> ${serverInfo}${msg.username} » ${msg.message}`;
+                    chatList.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Error fetching chat messages:', error);
+                chatList.innerHTML = `<li class="text-red-500">Error loading chat messages.</li>`;
+            }
+        }
+
+        async function fetchPunishments(username) {
+            banList.innerHTML = ''; // Clear previous
+            muteList.innerHTML = ''; // Clear previous
+            try {
+                const response = await fetch(`${API_BASE_URL}/player/${username}/punishments`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const punishments = await response.json();
+
+                const bans = punishments.filter(p => p.punishment_type === 'Ban');
+                const mutes = punishments.filter(p => p.punishment_type === 'Mute');
+
+                if (bans.length === 0) {
+                    banList.innerHTML = '<li class="text-gray-500">No ban history found.</li>';
+                } else {
+                    bans.forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-red-900/50';
+                        const moderatorText = p.moderator_name ? ` by ${p.moderator_name}` : '';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(p.punishment_timestamp).toLocaleString()}]</span> - Type: ${p.punishment_type}, Duration: ${p.duration}, Reason: ${p.reason}${moderatorText}`;
+                        banList.appendChild(li);
+                    });
+                }
+
+                if (mutes.length === 0) {
+                    muteList.innerHTML = '<li class="text-gray-500">No mute history found.</li>';
+                } else {
+                    mutes.forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-yellow-900/50';
+                        const moderatorText = p.moderator_name ? ` by ${p.moderator_name}` : '';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(p.punishment_timestamp).toLocaleString()}]</span> - Type: ${p.punishment_type}, Duration: ${p.duration}, Reason: ${p.reason}${moderatorText}`;
+                        muteList.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error fetching punishments:', error);
+                banList.innerHTML = `<li class="text-red-500">Error loading ban history.</li>`;
+                muteList.innerHTML = `<li class="text-red-500">Error loading mute history.</li>`;
+            }
+        }
+
+        async function fetchReports(username) {
+            reportsList.innerHTML = ''; // Clear previous
+            try {
+                const [reportsAgainstResponse, reportsByResponse] = await Promise.all([
+                    fetch(`${API_BASE_URL}/player/${username}/reports_against`),
+                    fetch(`${API_BASE_URL}/player/${username}/reports_by`)
+                ]);
+
+                if (!reportsAgainstResponse.ok) throw new Error(`HTTP error! status: ${reportsAgainstResponse.status}`);
+                if (!reportsByResponse.ok) throw new Error(`HTTP error! status: ${reportsByResponse.status}`);
+
+                const reportsAgainst = await reportsAgainstResponse.json();
+                const reportsBy = await reportsByResponse.json();
+
+                if (reportsAgainst.length === 0 && reportsBy.length === 0) {
+                    reportsList.innerHTML = '<li class="text-gray-500">No report history found.</li>';
+                    return;
+                }
+
+                // Display reports against the player
+                if (reportsAgainst.length > 0) {
+                    const h4Against = document.createElement('h4');
+                    h4Against.className = 'text-lg font-medium text-red-300 mt-2 mb-2';
+                    h4Against.textContent = `Reports Against ${username}:`;
+                    reportsList.appendChild(h4Against);
+                    reportsAgainst.forEach(r => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-red-900/50';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(r.report_timestamp).toLocaleString()}]</span> - Reported by: ${r.reporter_name}, Reason: ${r.reason}, Server: ${r.server_name}`;
+                        reportsList.appendChild(li);
+                    });
+                }
+
+                // Display reports made by the player
+                if (reportsBy.length > 0) {
+                    const h4By = document.createElement('h4');
+                    h4By.className = 'text-lg font-medium text-green-300 mt-4 mb-2';
+                    h4By.textContent = `Reports Made by ${username}:`;
+                    reportsList.appendChild(h4By);
+                    reportsBy.forEach(r => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-green-900/50';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(r.report_timestamp).toLocaleString()}]</span> - Reported: ${r.reported_name}, Reason: ${r.reason}, Server: ${r.server_name}`;
+                        reportsList.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error fetching reports:', error);
+                reportsList.innerHTML = `<li class="text-red-500">Error loading report history.</li>`;
+            }
+        }
+        
+        // New function to fetch kill history
+        async function fetchKillHistory(username) {
+            killList.innerHTML = ''; // Clear previous
+            try {
+                const response = await fetch(`${API_BASE_URL}/player/${username}/kills`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const kills = await response.json();
+                
+                if (kills.length === 0) {
+                    killList.innerHTML = '<li class="text-gray-500">No kill history found.</li>';
+                    return;
+                }
+
+                const killsBy = kills.filter(k => k.killer === username);
+                const killedBy = kills.filter(k => k.killed === username);
+
+                // Display kills by the player
+                if (killsBy.length > 0) {
+                    const h4By = document.createElement('h4');
+                    h4By.className = 'text-lg font-medium text-purple-300 mt-2 mb-2';
+                    h4By.textContent = `Kills by ${username}:`;
+                    killList.appendChild(h4By);
+                    killsBy.forEach(k => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-purple-900/50';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(k.timestamp).toLocaleString()}]</span> - Killed: ${k.killed}`;
+                        killList.appendChild(li);
+                    });
+                }
+                
+                // Display times the player was killed
+                if (killedBy.length > 0) {
+                    const h4Against = document.createElement('h4');
+                    h4Against.className = 'text-lg font-medium text-red-300 mt-4 mb-2';
+                    h4Against.textContent = `Killed by others:`;
+                    killList.appendChild(h4Against);
+                    killedBy.forEach(k => {
+                        const li = document.createElement('li');
+                        li.className = 'p-2 rounded-md bg-red-900/50';
+                        li.innerHTML = `<span class="font-semibold">[${new Date(k.timestamp).toLocaleString()}]</span> - Killed by: ${k.killer}`;
+                        killList.appendChild(li);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error fetching kill history:', error);
+                killList.innerHTML = `<li class="text-red-500">Error loading kill history.</li>`;
+            }
+        }
+    </script>
+</body>
+</html>
